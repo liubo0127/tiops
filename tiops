@@ -244,22 +244,23 @@ class Init(object):
                 print('\033[1;32;40mAuthorized_keys already configured. Skip.')
 
         print('\033[1;32;40mDownloading the {} version of tidb-ansible.'.format(self.version))
-        if self.version != 'master':
-            os.system('su - {} -c "git clone -b v{} https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
-                      .format(self.user, self.version))
-            os.system('su - {} -c "mv tidb-ansible {}"'
-                      .format(self.user, self.cluster_name))
-            print('\033[1;32;40mInstall jinja2/jmespath/ansible.')
-            os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
-                      .format(self.user, self.cluster_name))
-        elif self.version == 'master':
-            os.system('su - {} -c "git clone https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
-                      .format(self.user))
-            os.system('su - {} -c "mv tidb-ansible {}"'
-                      .format(self.user, self.cluster_name))
-            print('\033[1;32;40mInstall jinja2/jmespath/ansible')
-            os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
-                      .format(self.user, self.cluster_name))
+        if not os.path.isdir('/home/{}/{}'.format(self.user, self.cluster_name)):
+            if self.version != 'master':
+                os.system('su - {} -c "git clone -b v{} https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
+                          .format(self.user, self.version))
+                os.system('su - {} -c "mv tidb-ansible {}"'
+                          .format(self.user, self.cluster_name))
+                print('\033[1;32;40mInstall jinja2/jmespath/ansible.')
+                os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
+                          .format(self.user, self.cluster_name))
+            elif self.version == 'master':
+                os.system('su - {} -c "git clone https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
+                          .format(self.user))
+                os.system('su - {} -c "mv tidb-ansible {}"'
+                          .format(self.user, self.cluster_name))
+                print('\033[1;32;40mInstall jinja2/jmespath/ansible')
+                os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
+                          .format(self.user, self.cluster_name))
 
     def init_network(self, ip_list):
         initnet = ansibleapi.ANSRunner(ips=ip_list, user='root', password=self.password)
