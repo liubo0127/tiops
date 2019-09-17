@@ -1,8 +1,8 @@
 # tiops
 
-## Install dependency packages
+## Installation
 
-`pip install yaml-config IPy`
+`pip install tiops`
 
 ## Edit configuration
 
