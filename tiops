@@ -192,7 +192,7 @@ class Init(object):
                   'yum install -y curl sshpass python2-pip git &> /dev/null')
 
         if os.system('id {} &> /dev/null'.format(self.user)):
-            print('\033[1;32;40m{} user does not exist. Create user.'.format(self.user))
+            print('{} user does not exist. Create user.'.format(self.user))
             if self.password is None:
                 os.system('useradd {} -d /home/{}/'
                           .format(self.user, self.user))
@@ -200,7 +200,7 @@ class Init(object):
                 os.system('useradd {} -d /home/{}/ -p {}'
                           .format(self.user, self.user, self.password))
         else:
-            print('\033[1;32;40m{} user already exists. Skip.'.format(self.user))
+            print('{} user already exists. Skip.'.format(self.user))
 
         sudo = False
         with open('/etc/sudoers', 'r') as f:
@@ -210,21 +210,21 @@ class Init(object):
                     sudo = True
                     break
         if not sudo:
-            print('\033[1;32;40m{} user does not have sudo permissions. Add sudo permissions.'.format(self.user))
+            print('{} user does not have sudo permissions. Add sudo permissions.'.format(self.user))
             with open('/etc/sudoers', 'a') as f:
                 f.write('{} ALL=(ALL) NOPASSWD: ALL\n'
                         .format(self.user))
         else:
-            print('\033[1;32;40m{} user already have sudo permissions. Skip.'.format(self.user))
+            print('{} user already have sudo permissions. Skip.'.format(self.user))
 
         if not os.path.isfile('/home/{}/.ssh/id_rsa'.format(self.user)):
-            print('\033[1;32;40m{} user does not have SSH key. Start generating.'.format(self.user))
+            print('{} user does not have SSH key. Start generating.'.format(self.user))
             if not os.path.isdir('/home/{}/.ssh'.format(self.user)):
                 os.mkdir('/home/{}/.ssh'.format(self.user))
             os.system('su - {} -c "ssh-keygen -t rsa -N \'\' -f ~/.ssh/id_rsa -q"'
                       .format(self.user))
         else:
-            print('\033[1;32;40m{} user already have SSH key. Skip.'.format(self.user))
+            print('{} user already have SSH key. Skip.'.format(self.user))
 
         with open('/home/{}/.ssh/id_rsa.pub'.format(self.user), 'r') as f:
             pub_key = f.readlines()
@@ -237,20 +237,20 @@ class Init(object):
                 pub_keys = f.readlines()
 
             if pub_key[0] not in pub_keys:
-                print('\033[1;32;40mSet authorized_keys on management machine.')
+                print('Set authorized_keys on management machine.')
                 with open('/home/{}/.ssh/authorized_keys'.format(self.user), 'a') as f:
                     f.write(pub_key[0])
             else:
-                print('\033[1;32;40mAuthorized_keys already configured. Skip.')
+                print('Authorized_keys already configured. Skip.')
 
-        print('\033[1;32;40mDownloading the {} version of tidb-ansible.'.format(self.version))
+        print('Downloading the {} version of tidb-ansible.'.format(self.version))
         if not os.path.isdir('/home/{}/{}'.format(self.user, self.cluster_name)):
             if self.version != 'master':
                 os.system('su - {} -c "git clone -b v{} https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
                           .format(self.user, self.version))
                 os.system('su - {} -c "mv tidb-ansible {}"'
                           .format(self.user, self.cluster_name))
-                print('\033[1;32;40mInstall jinja2/jmespath/ansible.')
+                print('Install jinja2/jmespath/ansible.')
                 os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
                           .format(self.user, self.cluster_name))
             elif self.version == 'master':
@@ -258,9 +258,10 @@ class Init(object):
                           .format(self.user))
                 os.system('su - {} -c "mv tidb-ansible {}"'
                           .format(self.user, self.cluster_name))
-                print('\033[1;32;40mInstall jinja2/jmespath/ansible')
+                print('Install jinja2/jmespath/ansible')
                 os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
                           .format(self.user, self.cluster_name))
+        print('Done!!!\033[0m')
 
     def init_network(self, ip_list):
         initnet = ansibleapi.ANSRunner(ips=ip_list, user='root', password=self.password)
@@ -270,12 +271,12 @@ class Init(object):
                           'shell=/bin/bash '
                           'createhome=yes'
                           .format(self.user))
-        print('\033[1;32;40mSet authorized_keys for {} on cluster machine.'.format(self.user))
+        print('Set authorized_keys for {} on cluster machine.'.format(self.user))
         initnet.run_model('authorized_key',
                           'user=%s '
                           'key={{ lookup("file", "/home/%s/.ssh/id_rsa.pub") }}'
                           % (self.user, self.user))
-        print('\033[1;32;40mAdd sudo permissions for {} on cluster machine.'.format(self.user))
+        print('Add sudo permissions for {} on cluster machine.'.format(self.user))
         initnet.run_model('lineinfile',
                           'path=/etc/sudoers '
                           'line="{} ALL=(ALL) NOPASSWD: ALL" '
@@ -283,6 +284,7 @@ class Init(object):
                           'insertafter=EOF '
                           'state=present'
                           .format(self.user, self.user))
+        print('Done!!!\033[0m')
 
     def init_host(self, ip_list):
         inithost = ansibleapi.ANSRunner(ips=ip_list, user='root', password=self.password)
@@ -303,14 +305,15 @@ class Init(object):
                            '%s        hard        nofile        1000000\n'
                            '%s        soft        stack         10240\n"'
                            % (self.user, self.user, self.user, self.user))
-        print('\033[1;32;40mTurn off swap on remote machine.')
+        print('Turn off swap on remote machine.')
         inithost.run_model('shell',
                            'swapoff -a')
-        print('\033[1;32;40mStop firewalld on cluster machine.')
+        print('Stop firewalld on cluster machine.')
         inithost.run_model('service',
                            'name=firewalld '
                            'enabled=no '
                            'state=stopped')
+        print('Done!!!\033[0m')
 
 
 class Operation(object):
@@ -400,21 +403,24 @@ class Operation(object):
         os.system('ansible all -m file -a "name={} state=directory owner={} group={}"'
                   ' --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.deploy_dir, self.user, self.user, self.user))
-        print('\033[1;32;40mDeploying TiDB cluster, it may take a few minutes.')
+        print('Deploying TiDB cluster, it may take a few minutes.')
         os.system('ansible-playbook deploy.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
+        print('Done!!!\033[0m')
 
     def start(self):
         os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
         print('\033[1;32;40mStarting TiDB cluster, it may take a few minutes.')
         os.system('ansible-playbook start.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
+        print('Done!!!\033[0m')
 
     def stop(self):
         os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
         print('\033[1;32;40mStopping TiDB cluster, it may take a few minutes.')
         os.system('ansible-playbook stop.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
+        print('Done!!!\033[0m')
 
 
 if __name__ == '__main__':
