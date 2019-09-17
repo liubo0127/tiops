@@ -1,0 +1,454 @@
+#!/bin/env python2
+# coding: utf8
+
+import re
+import os
+import sys
+import yaml
+import IPy
+import argparse
+
+try:
+    from utils import ansibleapi
+except:
+    pass
+
+
+def init_args_parse():
+    operation = ['init',
+                 'init_network',
+                 'init_host',
+                 'deploy',
+                 'start',
+                 'stop',
+                 'restart',
+                 'start_node',
+                 'stop_node',
+                 'restart_node',
+                 'add_node',
+                 'del_node',
+                 'stop_machine',
+                 'del_machine',
+                 'display',
+                 'config']
+    if len(sys.argv) == 1 \
+            or sys.argv[1].lower() not in operation:
+        print('''usage: ops [-h] init|init_network|init_host|deploy ...
+
+positional arguments:
+  init              Initialize management machine
+  init_network      Initialize the ssh connection
+  init_host         Initialize machine parameters
+  deploy            Deploy TiDB cluster
+  start             Start TiDB cluster
+  stop              Stop TiDB cluster
+  restart           Restart TiDB cluster
+  start_node        Start specified service
+  stop_node         Stop specified service
+  restart_node      Restart specified service
+  add_node          Scale out cluster
+  del_node          Scale down cluster
+  stop_machine      Stop machine
+  del_machine       Delete machine from cluster
+  display           Display specified cluster topology
+  config            Modify configuration
+''')
+        exit(2)
+    elif '--help' in sys.argv \
+            or '-h' in sys.argv:
+        print('''usage: ops [-h] init|init_network|init_host|deploy ...
+
+positional arguments:
+  init              Initialize management machine
+  init_network      Initialize the ssh connection
+  init_host         Initialize machine parameters
+  deploy            Deploy TiDB cluster
+  start             Start TiDB cluster
+  stop              Stop TiDB cluster
+  restart           Restart TiDB cluster
+  start_node        Start specified service
+  stop_node         Stop specified service
+  restart_node      Restart specified service
+  add_node          Scale out cluster
+  del_node          Scale down cluster
+  stop_machine      Stop machine
+  del_machine       Delete machine from cluster
+  display           Display specified cluster topology
+  config            Modify configuration
+''')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('operation',
+                        help=argparse.SUPPRESS)
+
+    if sys.argv[1].lower() in ['init']:
+        parser.add_argument('-p',
+                            '--password',
+                            dest='password',
+                            help='Set password for tidb (default: None)',
+                            default=None)
+        parser.add_argument('-v',
+                            '--version',
+                            dest='version',
+                            help='TiDB cluster version(tags on github), for example: 3.0.3 (default: master)',
+                            default='master')
+        parser.add_argument('-n',
+                            '--cluster-name',
+                            dest='cluster_name',
+                            help='Cluster name',
+                            required=True)
+    elif sys.argv[1].lower() in ['init_network', 'init_host']:
+        parser.add_argument('-p',
+                            '--password',
+                            dest='password',
+                            help='The password for root (default: None)',
+                            default=None)
+        parser.add_argument('-i',
+                            '--ip-list',
+                            dest='ip_list',
+                            help='Initialized host list, for example: 10.0.1.10,10.0.1.11,10.0.1.12',
+                            required=True)
+        parser.add_argument('-P',
+                            '--port',
+                            dest='port',
+                            help='SSH port (default: 22)',
+                            default=22,
+                            type=int)
+    elif sys.argv[1].lower() in ['deploy']:
+        parser.add_argument('-c',
+                            '--config',
+                            dest='config',
+                            help='New cluster topology config, yaml format (default: "./topology.yaml")',
+                            default='./topology.yaml')
+        parser.add_argument('-n',
+                            '--cluster-name',
+                            dest='cluster_name',
+                            help='Cluster name',
+                            required=True)
+        parser.add_argument('-t',
+                            '--timezone',
+                            dest='timezone',
+                            help='Set timezone for cluster (default: Asia/Shanghai)',
+                            default='Asia/Shanghai')
+        parser.add_argument('-f',
+                            '--firewalld',
+                            dest='firewalld',
+                            help='Set firewalld (default: False)',
+                            default=False)
+        parser.add_argument('-o',
+                            '--ntp-server',
+                            dest='ntp_server',
+                            help='Automatically configured when ntp server is specified (default: None)',
+                            default=None)
+        parser.add_argument('-b',
+                            '--binlog',
+                            dest='enable_binlog',
+                            help='Whether to open binlog (default: False)',
+                            default=False)
+        parser.add_argument('-p',
+                            '--parallel',
+                            dest='parallel',
+                            help='Concurrency when deploy TiDB cluster (default: 5)',
+                            default=5,
+                            type=int)
+        parser.add_argument('-d',
+                            '--deploy-dir',
+                            dest='deploy_dir',
+                            help='Deployment path(current unavailable) (default: "/home/tidb/deploy")',
+                            default='/home/tidb/deploy/')
+    elif sys.argv[1].lower() in ['start', 'stop']:
+        parser.add_argument('-n',
+                            '--cluster-name',
+                            dest='cluster_name',
+                            help='Cluster name',
+                            required=True)
+        parser.add_argument('-b',
+                            '--binlog',
+                            dest='enable_binlog',
+                            help='Whether to open binlog (default: False)',
+                            default=False)
+        parser.add_argument('-p',
+                            '--parallel',
+                            dest='parallel',
+                            help='Concurrency when deploy TiDB cluster (default: 5)',
+                            default=5,
+                            type=int)
+
+    args = parser.parse_args()
+    return args
+
+
+class Init(object):
+    def __init__(self, passwd=None, port=22, version=None, cluster_name=None, user='tidb'):
+        self.password = passwd
+        self.version = version
+        self.port = port
+        self.cluster_name = cluster_name
+        self.user = user
+
+    def init(self):
+        print('\033[1;32;40mInstall dependency packages through yum.')
+        os.system('yum install -y epel-release &> /dev/null & '
+                  'yum install -y curl sshpass python2-pip git &> /dev/null')
+
+        if os.system('id {} &> /dev/null'.format(self.user)):
+            print('\033[1;32;40m{} user does not exist. Create user.'.format(self.user))
+            if self.password is None:
+                os.system('useradd {} -d /home/{}/'
+                          .format(self.user, self.user))
+            else:
+                os.system('useradd {} -d /home/{}/ -p {}'
+                          .format(self.user, self.user, self.password))
+        else:
+            print('\033[1;32;40m{} user already exists. Skip.'.format(self.user))
+
+        sudo = False
+        with open('/etc/sudoers', 'r') as f:
+            for line in f.readlines():
+                exists = re.search(r'^{} +ALL=\(ALL\) +NOPASSWD: +ALL'.format(self.user), line)
+                if exists:
+                    sudo = True
+                    break
+        if not sudo:
+            print('\033[1;32;40m{} user does not have sudo permissions. Add sudo permissions.'.format(self.user))
+            with open('/etc/sudoers', 'a') as f:
+                f.write('{} ALL=(ALL) NOPASSWD: ALL\n'
+                        .format(self.user))
+        else:
+            print('\033[1;32;40m{} user already have sudo permissions. Skip.'.format(self.user))
+
+        if not os.path.isfile('/home/{}/.ssh/id_rsa'.format(self.user)):
+            print('\033[1;32;40m{} user does not have SSH key. Start generating.'.format(self.user))
+            if not os.path.isdir('/home/{}/.ssh'.format(self.user)):
+                os.mkdir('/home/{}/.ssh'.format(self.user))
+            os.system('su - {} -c "ssh-keygen -t rsa -N \'\' -f ~/.ssh/id_rsa -q"'
+                      .format(self.user))
+        else:
+            print('\033[1;32;40m{} user already have SSH key. Skip.'.format(self.user))
+
+        with open('/home/{}/.ssh/id_rsa.pub'.format(self.user), 'r') as f:
+            pub_key = f.readlines()
+
+        if not os.path.isfile('/home/{}/.ssh/authorized_keys'.format(self.user)):
+            with open('/home/{}/.ssh/authorized_keys'.format(self.user), 'w') as f:
+                f.write(pub_key[0])
+        else:
+            with open('/home/{}/.ssh/authorized_keys'.format(self.user), 'r') as f:
+                pub_keys = f.readlines()
+
+            if pub_key[0] not in pub_keys:
+                print('\033[1;32;40mSet authorized_keys on management machine.')
+                with open('/home/{}/.ssh/authorized_keys'.format(self.user), 'a') as f:
+                    f.write(pub_key[0])
+            else:
+                print('\033[1;32;40mAuthorized_keys already configured. Skip.')
+
+        print('\033[1;32;40mDownloading the {} version of tidb-ansible.'.format(self.version))
+        if self.version != 'master':
+            os.system('su - {} -c "git clone -b v{} https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
+                      .format(self.user, self.version))
+            os.system('su - {} -c "mv tidb-ansible {}"'
+                      .format(self.user, self.cluster_name))
+            print('\033[1;32;40mInstall jinja2/jmespath/ansible.')
+            os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
+                      .format(self.user, self.cluster_name))
+        elif self.version == 'master':
+            os.system('su - {} -c "git clone https://github.com/pingcap/tidb-ansible.git" &> /dev/null'
+                      .format(self.user))
+            os.system('su - {} -c "mv tidb-ansible {}"'
+                      .format(self.user, self.cluster_name))
+            print('\033[1;32;40mInstall jinja2/jmespath/ansible')
+            os.system('su - {} -c "sudo pip install -r ./{}/requirements.txt" &> /dev/null'
+                      .format(self.user, self.cluster_name))
+
+    def init_network(self, ip_list):
+        initnet = ansibleapi.ANSRunner(ips=ip_list, user='root', password=self.password)
+        print('\033[1;32;40mCreate {} user on remote machines.'.format(self.user))
+        initnet.run_model('user',
+                          'name={} '
+                          'shell=/bin/bash '
+                          'createhome=yes'
+                          .format(self.user))
+        print('\033[1;32;40mSet authorized_keys for {} on cluster machine.'.format(self.user))
+        initnet.run_model('authorized_key',
+                          'user=%s '
+                          'key={{ lookup("file", "/home/%s/.ssh/id_rsa.pub") }}'
+                          % (self.user, self.user))
+        print('\033[1;32;40mAdd sudo permissions for {} on cluster machine.'.format(self.user))
+        initnet.run_model('lineinfile',
+                          'path=/etc/sudoers '
+                          'line="{} ALL=(ALL) NOPASSWD: ALL" '
+                          'regexp="^{} .*" '
+                          'insertafter=EOF '
+                          'state=present'
+                          .format(self.user, self.user))
+
+    def init_host(self, ip_list):
+        inithost = ansibleapi.ANSRunner(ips=ip_list, user='root', password=self.password)
+        print('\033[1;32;40mUpdate kernel parameters on cluster machine.')
+        inithost.run_model('sysctl',
+                           'name={{ item.name }} value={{ item.value }}',
+                           become=True,
+                           with_items=[{'name': 'net.ipv4.tcp_tw_recycle', 'value': 0},
+                                       {'name': 'net.core.somaxconn', "value": 32768},
+                                       {'name': 'vm.swappiness', "value": 0},
+                                       {'name': 'net.ipv4.tcp_syncookies', "value": 0},
+                                       {'name': 'fs.file-max', "value": 1000000}])
+        inithost.run_model('blockinfile',
+                           'path="/etc/security/limits.conf" '
+                           'insertbefore="# End of file" '
+                           'marker="#{mark} TiDB %s MANAGED BLOCK" '
+                           'block="%s        soft        nofile        1000000\n'
+                           '%s        hard        nofile        1000000\n'
+                           '%s        soft        stack         10240\n"'
+                           % (self.user, self.user, self.user, self.user))
+        print('\033[1;32;40mTurn off swap on remote machine.')
+        inithost.run_model('shell',
+                           'swapoff -a')
+        print('\033[1;32;40mStop firewalld on cluster machine.')
+        inithost.run_model('service',
+                           'name=firewalld '
+                           'enabled=no '
+                           'state=stopped')
+
+
+class Operation(object):
+    def __init__(self, config=None, deploy_dir=None, cluster_name=None, timezone='Asia/Shanghai', firewalld=False,
+                 ntp_server=None, enable_binlog=False, parallel=5, user='tidb'):
+        self.config = config
+        self.deploy_dir = deploy_dir
+        self.cluster_name = cluster_name
+        self.timezone = timezone
+        self.firewalld = firewalld
+        self.ntp_server = ntp_server
+        self.enable_binlog = enable_binlog
+        self.parallel = parallel
+        self.user = user
+
+    def _config(self):
+        with open(self.config, 'r') as f:
+            return yaml.load(f)
+
+    def generate_inventory(self):
+        ops_conf = self._config()
+        conf_keys = [i.keys()[0] for i in ops_conf]
+        with open('/home/{}/{}/inventory.ini'
+                          .format(self.user, self.cluster_name), 'r') as original_file:
+            lines = original_file.readlines()
+        with open('/home/{}/{}/inventory.ini'
+                          .format(self.user, self.cluster_name), 'w') as new_file:
+            for line in lines:
+                line = line.strip()
+                if re.search(r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]'
+                             r'[0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|'
+                             r'[01]?[0-9][0-9]?)', line):
+                    continue
+                else:
+                    new_file.write('{}\n'.format(line))
+        with open('/home/{}/{}/inventory.ini'.format(self.user, self.cluster_name), 'r') as pure_conf:
+            pure_lines = pure_conf.readlines()
+        with open('/home/{}/{}/inventory.ini'.format(self.user, self.cluster_name), 'w') as conf_set:
+            for conf_line in pure_lines:
+                conf_line = conf_line.strip()
+                if conf_line.strip('[]') in conf_keys:
+                    conf_set.write('{}\n'.format(conf_line))
+                    instance_info = ''
+                    for group in ops_conf:
+                        if group.has_key(conf_line.strip('[]')):
+                            for all_value in group.itervalues():
+                                for signal_key, signal_value in all_value.iteritems():
+                                    instance_info += '{}'.format(signal_key)
+                                    for key, value in signal_value.iteritems():
+                                        if key == 'ip':
+                                            instance_info += ' ansible_host={}'.format(value)
+                                        else:
+                                            instance_info += ' {}={}'.format(key, value)
+                                    instance_info += '\n'
+                    conf_set.write(instance_info)
+                elif re.match(r'^deploy_dir', conf_line):
+                    conf_set.write('deploy_dir = {}\n'.format(self.deploy_dir))
+                elif re.match(r'^ansible_user', conf_line):
+                    conf_set.write('ansible_user = {}\n'.format(self.user))
+                elif re.match(r'^cluster_name', conf_line):
+                    conf_set.write('cluster_name = {}\n'.format(self.cluster_name))
+                elif re.match(r'^enable_ntpd', conf_line) and not self.ntp_server:
+                    conf_set.write('enable_ntpd = False\n')
+                elif re.match(r'^enable_firewalld', conf_line) and self.firewalld:
+                    conf_set.write('enable_firewalld = True\n')
+                elif re.match(r'^enable_binlog', conf_line) and self.enable_binlog:
+                    conf_set.write('enable_binlog = True\n')
+                else:
+                    conf_set.write('{}\n'.format(conf_line))
+        with open('/home/{}/{}/group_vars/all.yml'
+                          .format(self.user, self.cluster_name), 'r') as ansible_all:
+            ansible_all_lines = ansible_all.readlines()
+        with open('/home/{}/{}/group_vars/all.yml'.
+                          format(self.user, self.cluster_name), 'w') as ansible_new_all:
+            for line in ansible_all_lines:
+                line = line.strip()
+                if re.match(r'^dev_mode', line):
+                    ansible_new_all.write('dev_mode: True\n')
+                else:
+                    ansible_new_all.write('{}\n'.format(line))
+
+    def deploy(self):
+        os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
+        print('\033[1;32;40mDownload TiDB related binary, it may take a few minutes.')
+        os.system('ansible-playbook local_prepare.yml --private-key=/home/{}/.ssh/id_rsa'
+                  .format(self.user))
+        os.system('ansible all -m file -a "name={} state=directory owner={} group={}"'
+                  ' --private-key=/home/{}/.ssh/id_rsa'
+                  .format(self.deploy_dir, self.user, self.user, self.user))
+        print('\033[1;32;40mDeploying TiDB cluster, it may take a few minutes.')
+        os.system('ansible-playbook deploy.yml --private-key=/home/{}/.ssh/id_rsa'
+                  .format(self.user))
+
+    def start(self):
+        os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
+        print('\033[1;32;40mStarting TiDB cluster, it may take a few minutes.')
+        os.system('ansible-playbook start.yml --private-key=/home/{}/.ssh/id_rsa'
+                  .format(self.user))
+
+    def stop(self):
+        os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
+        print('\033[1;32;40mStopping TiDB cluster, it may take a few minutes.')
+        os.system('ansible-playbook stop.yml --private-key=/home/{}/.ssh/id_rsa'
+                  .format(self.user))
+
+
+if __name__ == '__main__':
+    args = init_args_parse()
+    if args.operation == 'init':
+        init = Init(passwd=args.password,
+                    version=args.version,
+                    cluster_name=args.cluster_name)
+        init.init()
+    elif args.operation == 'init_network':
+        init = Init(passwd=args.password,
+                    port=args.port)
+        init.init_network(args.ip_list)
+    elif args.operation == 'init_host':
+        init = Init(passwd=args.password,
+                    port=args.port)
+        init.init_host(args.ip_list)
+    elif args.operation == 'deploy':
+        init = Operation(config=args.config,
+                         deploy_dir=args.deploy_dir,
+                         cluster_name=args.cluster_name,
+                         timezone=args.timezone,
+                         firewalld=args.firewalld,
+                         ntp_server=args.ntp_server,
+                         enable_binlog=args.enable_binlog,
+                         parallel=args.parallel)
+        init.generate_inventory()
+        init.deploy()
+    elif args.operation == 'start':
+        init = Operation(cluster_name=args.cluster_name,
+                         enable_binlog=args.enable_binlog,
+                         parallel=args.parallel)
+        init.start()
+    elif args.operation == 'stop':
+        init = Operation(cluster_name=args.cluster_name,
+                         enable_binlog=args.enable_binlog,
+                         parallel=args.parallel)
+        init.stop()

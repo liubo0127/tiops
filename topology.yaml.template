@@ -1,0 +1,57 @@
+---
+
+- pd_servers:
+    pd1:
+      ip: 10.0.1.11
+      pd_client_port: 2379
+      pd_peer_port: 2380
+      deploy_dir: /home/tidb/deploy
+    pd2:
+      ip: 10.0.1.12
+    pd3:
+      ip: 10.0.1.13
+
+- tidb_servers:
+    tidb1:
+      ip: 10.0.1.11
+      tidb_port: 4000
+      tidb_status_port: 10080
+      deploy_dir: /home/tidb/deploy
+    tidb2:
+      ip: 10.0.1.12
+
+- tikv_servers:
+    tikv1:
+      ip: 10.0.1.14
+      deploy_dir: /home/tidb/deploy
+      tikv_port: 20160
+      tikv_status_port: 20180
+    tikv2:
+      ip: 10.0.1.15
+      deploy_dir: /home/tidb/deploy
+      tikv_port: 20160
+      tikv_status_port: 20180
+    tikv3:
+      ip: 10.0.1.16
+
+- monitored_servers:
+    node1:
+      ip: 10.0.1.11
+    node2:
+      ip: 10.0.1.12
+    node3:
+      ip: 10.0.1.13
+    node4:
+      ip: 10.0.1.14
+    node5:
+      ip: 10.0.1.15
+    node6:
+      ip: 10.0.1.16
+
+- monitoring_servers:
+    prometheus:
+      ip: 10.0.1.11
+
+- grafana_servers:
+    grafana:
+      ip: 10.0.1.11
