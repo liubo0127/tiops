@@ -2,7 +2,7 @@
 
 ## Install dependency packages
 
-`pip install yaml-config IPy`
+`pip install PyYAML IPy`
 
 ## Edit configuration
 
@@ -24,6 +24,10 @@
 
 ## Operation guide
 
+> Note:
+>
+> Please use the root user to execute `tiops`.
+
 ### Initialize the management machine
 
 - `./tiops init -v ${version} -n ${cluster_name}`
@@ -35,33 +39,33 @@
 
 ### Initialize the cluster machine
 
-- `./tiops init_network -p ${root_password} -i ${cluster_ip_list} -P ${ssh_port}`
-- `./tiops init_host -p ${root_password} -i ${cluster_ip_list} -P ${ssh_port}`
+- `./tiops init_network -p ${root_password} -i ${cluster_ip_list}`
+- `./tiops init_host -p ${root_password} -i ${cluster_ip_list}`
 
 > Note:
 >
 > For example:
-> `./tiops init_network -p 'tidbtest!@#' -i 10.0.1.11,10.0.1.12,10.0.1.13 -P 22`
-> `./tiops init_host -p 'tidbtest!@#' -i 10.0.1.11,10.0.1.12,10.0.1.13 -P 22` 
+> `./tiops init_network -p 'tidbtest!@#' -i 10.0.1.11,10.0.1.12,10.0.1.13`
+> `./tiops init_host -p 'tidbtest!@#' -i 10.0.1.11,10.0.1.12,10.0.1.13` 
 > For details please execute `./tiops init_network -h` and `./tiops init_host -h`
 
 ### Deploy TiDB cluster
 
-- `./tiops deploy -c ${config} -n ${cluster_name} -d ${deploy_dir} -p ${parallel} -b ${True/False}`
+- `./tiops deploy -c ${config} -n ${cluster_name} -d ${deploy_dir} -b ${True/False}`
 
 > Note:
 > 
 > For example:
-> `./tiops deploy -c ./topology.yaml -n tidb-cluster -d /home/tidb/deploy -p  5 -b False`
+> `./tiops deploy -c ./topology.yaml -n tidb-cluster -d /home/tidb/deploy -b False`
 > For details please execute `./tiops deploy -h`
 
 ### Start/Stop TiDB cluster
 
-- `./tiops start -n ${cluster_name} -b ${True/False} -p ${parallel}`
+- `./tiops start -n ${cluster_name} -b ${True/False}`
 
 > Note:
 >
 > For example:
-> `./tiops start -n tidb-cluster -b False -p 5`
-> `./tiops stop -n tidb-cluster -b False -p 5`
+> `./tiops start -n tidb-cluster -b False`
+> `./tiops stop -n tidb-cluster -b False`
 > For details please execute `./tiops start -h` and `./tiops stop -h`

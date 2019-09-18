@@ -4,8 +4,8 @@
 import re
 import os
 import sys
+import json
 import yaml
-import IPy
 import argparse
 
 try:
@@ -332,7 +332,98 @@ class Operation(object):
 
     def _config(self):
         with open(self.config, 'r') as f:
-            return yaml.load(f, Loader=yaml.FullLoader)
+            try:
+                yaml_topology = yaml.load(f, Loader=yaml.FullLoader)
+            except:
+                yaml_topology = yaml.load(f)
+        conflict_list = {}
+        for group in yaml_topology:
+            for group_name, group_members in group.iteritems():
+                info = {}
+                if group_name == 'pd_servers':
+                    for node_name, node_vars in group_members.iteritems():
+                        if not node_vars.has_key('pd_client_port'):
+                            node_vars['pd_client_port'] = 2379
+                        if not node_vars.has_key('pd_peer_port'):
+                            node_vars['pd_peer_port'] = 2380
+                        if not node_vars.has_key('deploy_dir'):
+                            node_vars['deploy_dir'] = self.deploy_dir
+                        if not info.has_key(node_vars['ip']):
+                            info[node_vars['ip']] = []
+                        info[node_vars['ip']].append([node_name,
+                                                      node_vars['pd_client_port'],
+                                                      node_vars['pd_peer_port'],
+                                                      node_vars['deploy_dir']])
+                    conflict_node = []
+                    for info_name, info_vars in info.iteritems():
+                        length = len(info_vars)
+                        for i in range(length - 1):
+                            for j in range(i + 1, length):
+                                for node_info_vars in info[info_name][i][1:]:
+                                    if node_info_vars in info[info_name][j]:
+                                        conflict_node.append(info[info_name][i][0])
+                                        conflict_node.append(info[info_name][j][0])
+                                        continue
+                        if conflict_node:
+                            conflict_list['pd_servers'] = {}
+                            conflict_list['pd_servers'][info_name] = list(set(conflict_node))
+                elif group_name == 'tikv_servers':
+                    for node_name, node_vars in group_members.iteritems():
+                        if not node_vars.has_key('tikv_port'):
+                            node_vars['tikv_port'] = 20160
+                        if not node_vars.has_key('tikv_status_port'):
+                            node_vars['tikv_status_port'] = 20180
+                        if not node_vars.has_key('deploy_dir'):
+                            node_vars['deploy_dir'] = self.deploy_dir
+                        if not info.has_key(node_vars['ip']):
+                            info[node_vars['ip']] = []
+                        info[node_vars['ip']].append([node_name,
+                                                      node_vars['tikv_port'],
+                                                      node_vars['tikv_status_port'],
+                                                      node_vars['deploy_dir']])
+                    conflict_node = []
+                    for info_name, info_vars in info.iteritems():
+                        length = len(info_vars)
+                        for i in range(length - 1):
+                            for j in range(i + 1, length):
+                                for node_info_vars in info[info_name][i][1:]:
+                                    if node_info_vars in info[info_name][j]:
+                                        conflict_node.append(info[info_name][i][0])
+                                        conflict_node.append(info[info_name][j][0])
+                                        continue
+                        if conflict_node:
+                            conflict_list['tikv_servers'] = {}
+                            conflict_list['tikv_servers'][info_name] = list(set(conflict_node))
+                if group_name == 'tidb_servers':
+                    for node_name, node_vars in group_members.iteritems():
+                        if not node_vars.has_key('tidb_port'):
+                            node_vars['tidb_port'] = 400
+                        if not node_vars.has_key('tidb_status_port'):
+                            node_vars['tidb_status_port'] = 10080
+                        if not node_vars.has_key('deploy_dir'):
+                            node_vars['deploy_dir'] = self.deploy_dir
+                        if not info.has_key(node_vars['ip']):
+                            info[node_vars['ip']] = []
+                        info[node_vars['ip']].append([node_name,
+                                                      node_vars['tidb_port'],
+                                                      node_vars['tidb_status_port'],
+                                                      node_vars['deploy_dir']])
+                    conflict_node = []
+                    for info_name, info_vars in info.iteritems():
+                        length = len(info_vars)
+                        for i in range(length - 1):
+                            for j in range(i + 1, length):
+                                for node_info_vars in info[info_name][i][1:]:
+                                    if node_info_vars in info[info_name][j]:
+                                        conflict_node.append(info[info_name][i][0])
+                                        conflict_node.append(info[info_name][j][0])
+                                        continue
+                        if conflict_node:
+                            conflict_list['pd_servers'] = {}
+                            conflict_list['pd_servers'][info_name] = list(set(conflict_node))
+        if conflict_list:
+            print('\033[1;31;40mConfiguration conflict: {}\033[0m'.format(json.dumps(conflict_list, indent=4)))
+            exit(2)
 
     def generate_inventory(self):
         ops_conf = self._config()
