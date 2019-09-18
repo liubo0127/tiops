@@ -221,6 +221,7 @@ class Init(object):
             print('{} user does not have SSH key. Start generating.'.format(self.user))
             if not os.path.isdir('/home/{}/.ssh'.format(self.user)):
                 os.mkdir('/home/{}/.ssh'.format(self.user))
+                os.system('chown -R {}:{} /home/{}/.ssh'.format(self.user, self.user, self.user))
             os.system('su - {} -c "ssh-keygen -t rsa -N \'\' -f ~/.ssh/id_rsa -q"'
                       .format(self.user))
         else:
@@ -331,7 +332,7 @@ class Operation(object):
 
     def _config(self):
         with open(self.config, 'r') as f:
-            return yaml.load(f)
+            return yaml.load(f, Loader=yaml.FullLoader)
 
     def generate_inventory(self):
         ops_conf = self._config()
