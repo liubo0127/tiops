@@ -422,7 +422,8 @@ class Operation(object):
                             conflict_list['pd_servers'] = {}
                             conflict_list['pd_servers'][info_name] = list(set(conflict_node))
         if conflict_list:
-            print('\033[1;31;40mConfiguration conflict: {}\033[0m'.format(json.dumps(conflict_list, indent=4)))
+            print('\033[1;31;40mConfiguration conflict:')
+            print('{}\033[0m'.format(json.dumps(conflict_list, indent=4)))
             exit(2)
 
     def generate_inventory(self):
@@ -489,7 +490,7 @@ class Operation(object):
 
     def deploy(self):
         os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
-        print('\033[1;32;40mDownload TiDB related binary, it may take a few minutes.')
+        print('\033[1;32;40mDownload TiDB related binary, it may take a few minutes.\033[0m')
         os.system('ansible-playbook local_prepare.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
         os.system('ansible all -m file -a "name={} state=directory owner={} group={}"'
@@ -498,21 +499,21 @@ class Operation(object):
         print('Deploying TiDB cluster, it may take a few minutes.')
         os.system('ansible-playbook deploy.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
-        print('Done!!!\033[0m')
+        print('\033[1;32;40mDone!!!\033[0m')
 
     def start(self):
         os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
-        print('\033[1;32;40mStarting TiDB cluster, it may take a few minutes.')
+        print('\033[1;32;40mStarting TiDB cluster, it may take a few minutes.\033[0m')
         os.system('ansible-playbook start.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
-        print('Done!!!\033[0m')
+        print('\033[1;32;40mDone!!!\033[0m')
 
     def stop(self):
         os.chdir('/home/{}/{}'.format(self.user, self.cluster_name))
-        print('\033[1;32;40mStopping TiDB cluster, it may take a few minutes.')
+        print('\033[1;32;40mStopping TiDB cluster, it may take a few minutes.\033[0m')
         os.system('ansible-playbook stop.yml --private-key=/home/{}/.ssh/id_rsa'
                   .format(self.user))
-        print('Done!!!\033[0m')
+        print('\033[1;32;40mDone!!!\033[0m')
 
 
 if __name__ == '__main__':
